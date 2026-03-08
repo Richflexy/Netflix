@@ -1,20 +1,18 @@
 import telebot
 from telebot import types
 import random
+import os
 
 # ================= CONFIG =================
 TOKEN = "8730805668:AAGnUrxv2NGZ0X1tcBoPVOLeTHzOq2PT-mQ"
+OWNER_ID = 8260250818
 bot = telebot.TeleBot(TOKEN)
 
-ADMINS = [123456789]  # Replace with your Telegram ID
+ADMINS = [OWNER_ID]
 
-# Users storage
-users = {}
+users = {}  # chat_id -> {"points": int, "invited": int, "joined": bool}
+netflix_urls = []  # Netflix URLs queue
 
-# Netflix URL queue
-netflix_urls = []
-
-# Channels to join (private links)
 CHANNELS = {
     "Main": "https://t.me/+PUNNwvX-zRsyMWQ9",
     "Channel": "https://t.me/+WjxC9uqbrgVmMjk1",
@@ -22,33 +20,31 @@ CHANNELS = {
 }
 
 EMOJIS = ["❣️", "✨", "🔥", "💰", "✅", "👥", "🎬", "❤️"]
-def kind_emoji():
-    return random.choice(EMOJIS)
+def kind_emoji(): return random.choice(EMOJIS)
 
 # ================= START =================
 @bot.message_handler(commands=['start'])
 def start(msg):
     chat_id = msg.chat.id
     if chat_id not in users:
-        users[chat_id] = {"points":0,"referrals":0}
+        users[chat_id] = {"points": 0, "invited": 0, "joined": False}
 
     # Referral
     parts = msg.text.split()
-    if len(parts)>1:
+    if len(parts) > 1:
         try:
-            referrer_id = int(parts[1])
-            if referrer_id != chat_id:
-                users.setdefault(referrer_id, {"points":0,"referrals":0})
-                users[referrer_id]["points"] += 1
-                users[referrer_id]["referrals"] +=1
+            referrer = int(parts[1])
+            if referrer != chat_id:
+                users[chat_id]["referrer"] = referrer
         except: pass
 
-    bot.send_message(chat_id, f"👋 Welcome! {kind_emoji()}\nJoin channels to unlock the bot:")
+    # Ask to join channels first
+    bot.send_message(chat_id, f"👋 Welcome! {kind_emoji()}\nJoin all channels to unlock the bot:")
     keyboard = types.InlineKeyboardMarkup()
     for name, link in CHANNELS.items():
         keyboard.add(types.InlineKeyboardButton(name, url=link))
     keyboard.add(types.InlineKeyboardButton(f"✅ I joined all channels {kind_emoji()}", callback_data="check_join"))
-    bot.send_message(chat_id,"Tap below after joining:",reply_markup=keyboard)
+    bot.send_message(chat_id, "Join channels then tap below:", reply_markup=keyboard)
 
 # ================= CALLBACK =================
 @bot.callback_query_handler(func=lambda call: True)
@@ -56,68 +52,85 @@ def callback(call):
     chat_id = call.message.chat.id
 
     if call.data=="check_join":
-        bot.send_message(chat_id,f"✅ Channels confirmed joined! Bot unlocked {kind_emoji()}")
+        # Assume joined for simplicity
+        users[chat_id]["joined"] = True
+
+        # Give referral point if exists
+        referrer = users.get(chat_id, {}).get("referrer")
+        if referrer and referrer in users:
+            users[referrer]["points"] += 1
+            users[referrer]["invited"] += 1
+            del users[chat_id]["referrer"]
+
+        bot.send_message(chat_id, f"✅ Channels joined! Bot unlocked {kind_emoji()}")
         send_main_menu(chat_id)
 
     elif call.data=="points":
-        pts = users.get(chat_id,{}).get("points",0)
-        bot.send_message(chat_id,f"💰 Your Points: {pts} {kind_emoji()}\n3 points = 1 Netflix ❣️")
+        pts = users.get(chat_id, {}).get("points", 0)
+        if chat_id == OWNER_ID:
+            pts = "Unlimited 🔥"
+        bot.send_message(chat_id, f"💰 Your Points: {pts} {kind_emoji()}\n3 points = 1 Netflix ❣️")
 
     elif call.data=="redeem_netflix":
-        if users.get(chat_id,{}).get("points",0)>=3:
+        if chat_id == OWNER_ID:
+            account = netflix_urls[0] if netflix_urls else "No URLs left"
+            bot.send_message(chat_id, f"✅ Owner redeem:\n{account}")
+            return
+
+        if users.get(chat_id, {}).get("points",0) >=3:
             if netflix_urls:
                 account = netflix_urls.pop(0)
-                users[chat_id]["points"]-=3
-                bot.send_message(chat_id,f"✅ Redeemed! {kind_emoji()}\n{account}")
+                users[chat_id]["points"] -=3
+                bot.send_message(chat_id, f"✅ Redeemed! {kind_emoji()}\n{account}")
             else:
-                bot.send_message(chat_id,f"❌ No Netflix URLs left {kind_emoji()}")
+                bot.send_message(chat_id, f"❌ No Netflix URLs left {kind_emoji()}")
         else:
-            bot.send_message(chat_id,f"❌ Not enough points {kind_emoji()}\n3 points = 1 Netflix ❣️")
+            bot.send_message(chat_id, f"❌ Not enough points {kind_emoji()}")
 
     elif call.data=="referral":
-        bot_username = "YourBotUsername" # Replace with your bot username
+        bot_username = bot.get_me().username
         referral_link = f"https://t.me/{bot_username}?start={chat_id}"
-        bot.send_message(chat_id,f"🎯 Your referral link:\n{referral_link}\nShare to earn points {kind_emoji()}")
+        invited = users.get(chat_id, {}).get("invited",0)
+        bot.send_message(chat_id,
+f"""💰 Invite Users And Earn 1 POINT
+💹 Your Link: {referral_link}
+🎯 You Invited : {invited} Users {kind_emoji()}""")
 
 # ================= MAIN MENU =================
 def send_main_menu(chat_id):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(f"💰 My Points {kind_emoji()}",callback_data="points"))
-    keyboard.add(types.InlineKeyboardButton(f"🎬 Redeem Netflix {kind_emoji()}",callback_data="redeem_netflix"))
-    keyboard.add(types.InlineKeyboardButton(f"👥 Earn Points / Referral {kind_emoji()}",callback_data="referral"))
-    bot.send_message(chat_id,"Select an option:",reply_markup=keyboard)
+    keyboard.add(types.InlineKeyboardButton(f"💰 My Points {kind_emoji()}", callback_data="points"))
+    keyboard.add(types.InlineKeyboardButton(f"🎬 Redeem Netflix {kind_emoji()}", callback_data="redeem_netflix"))
+    keyboard.add(types.InlineKeyboardButton(f"👥 Earn Points / Referral {kind_emoji()}", callback_data="referral"))
+    bot.send_message(chat_id, "Select an option:", reply_markup=keyboard)
 
-# ================= ADMIN COMMAND =================
+# ================= ADMIN: ADD POINTS =================
 @bot.message_handler(commands=['addpoints'])
 def addpoints(msg):
-    if msg.chat.id not in ADMINS:
-        return
+    if msg.chat.id not in ADMINS: return
     try:
         parts = msg.text.split()
         user_id = int(parts[1])
         points = int(parts[2])
-        users.setdefault(user_id,{"points":0,"referrals":0})
-        users[user_id]["points"]+=points
+        users.setdefault(user_id, {"points":0,"invited":0,"joined":True})
+        users[user_id]["points"] += points
         bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
     except:
         bot.send_message(msg.chat.id,f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
 
-# ================= NEW: RECEIVE NETFLIX URLS =================
+# ================= ADMIN: REPLACE NETFLIX URLS =================
 @bot.message_handler(commands=['addnetflix'])
 def add_netflix(msg):
-    # Only admin can send
-    if msg.chat.id not in ADMINS:
-        return
+    if msg.chat.id not in ADMINS: return
     try:
-        # admin sends URLs separated by newline
-        urls = msg.text.split("\n")[1:]  # skip command itself
+        urls = msg.text.split("\n")[1:]
+        netflix_urls.clear()  # Clear old URLs
         for u in urls:
             u = u.strip()
-            if u:
-                netflix_urls.append(u)
-        bot.send_message(msg.chat.id,f"✅ Added {len(urls)} Netflix URL(s) {kind_emoji()}")
+            if u: netflix_urls.append(u)
+        bot.send_message(msg.chat.id,f"✅ Replaced Netflix URLs with {len(urls)} new ones {kind_emoji()}")
     except Exception as e:
-        bot.send_message(msg.chat.id,f"❌ Error adding URLs: {e}")
+        bot.send_message(msg.chat.id,f"❌ Error: {e}")
 
 # ================= RUN BOT =================
 bot.infinity_polling()
