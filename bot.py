@@ -15,7 +15,7 @@ users = {}
 # Single Netflix URL
 NETFLIX_URL = "https://netflix.com/login/yourlink"  # Replace with your Netflix URL
 
-# Channels to join
+# Channels to join (private invite links)
 CHANNELS = {
     "Main": "https://t.me/+PUNNwvX-zRsyMWQ9",
     "Channel": "https://t.me/+WjxC9uqbrgVmMjk1",
@@ -64,34 +64,22 @@ def start(msg):
 def callback(call):
     chat_id = call.message.chat.id
 
-    # Check join
+    # Since channels are private, we just trust user confirmation
     if call.data == "check_join":
-        not_joined = []
-        for name, link in CHANNELS.items():
-            try:
-                username = link.split("t.me/")[1].replace("+", "")
-                member = bot.get_chat_member(f"@{username}", chat_id)
-                if member.status in ["left", "kicked"]:
-                    not_joined.append(name)
-            except:
-                not_joined.append(name)
+        bot.send_message(chat_id, f"✅ Channels confirmed joined! Bot unlocked {kind_emoji()}")
+        send_main_menu(chat_id)
 
-        if not_joined:
-            bot.send_message(chat_id, f"❌ You must join: {', '.join(not_joined)} {kind_emoji()}")
-        else:
-            bot.send_message(chat_id, f"✅ All channels joined! Bot unlocked {kind_emoji()}")
-            send_main_menu(chat_id)
-
-    # Main menu buttons
     elif call.data == "points":
         pts = users.get(chat_id, {}).get('points', 0)
         bot.send_message(chat_id, f"💰 Your Points: {pts} {kind_emoji()}\n3 points = 1 Netflix ❣️")
+
     elif call.data == "redeem_netflix":
         if users.get(chat_id, {}).get("points",0) >= 3:
             users[chat_id]["points"] -= 3
             bot.send_message(chat_id, f"✅ Redeemed successfully {kind_emoji()}\nHere is your Netflix URL:\n{NETFLIX_URL}")
         else:
             bot.send_message(chat_id, f"❌ Not enough points {kind_emoji()}\nYou need 3 points to redeem Netflix ❣️")
+
     elif call.data == "referral":
         referral_link = f"https://t.me/YourBotUsername?start={chat_id}"  # Replace with your bot username
         bot.send_message(chat_id, f"🎯 Your referral link:\n{referral_link}\nShare it with friends to earn points {kind_emoji()}")
