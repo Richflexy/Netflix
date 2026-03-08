@@ -28,7 +28,7 @@ def start(msg):
     if chat_id not in users:
         users[chat_id] = {"points": 0, "invited": 0, "joined": False}
 
-    # Referral system
+    # Referral
     parts = msg.text.split()
     if len(parts) > 1:
         try:
@@ -50,11 +50,10 @@ def start(msg):
 def callback(call):
     chat_id = call.message.chat.id
 
-    if call.data == "check_join":
-        # Assume joined for simplicity
+    if call.data=="check_join":
         users[chat_id]["joined"] = True
 
-        # Give referral points
+        # Give referral point if exists
         referrer = users.get(chat_id, {}).get("referrer")
         if referrer and referrer in users:
             users[referrer]["points"] += 1
@@ -64,36 +63,35 @@ def callback(call):
         bot.send_message(chat_id, f"✅ Channels joined! Bot unlocked {kind_emoji()}")
         send_main_menu(chat_id)
 
-    elif call.data == "points":
+    elif call.data=="points":
         pts = users.get(chat_id, {}).get("points", 0)
         if chat_id == OWNER_ID:
             pts = "Unlimited 🔥"
         bot.send_message(chat_id, f"💰 Your Points: {pts} {kind_emoji()}\n3 points = 1 Netflix ❣️")
 
-    elif call.data == "redeem_netflix":
-        if not netflix_urls:
-            bot.send_message(chat_id, f"❌ No Netflix URLs left {kind_emoji()}")
-            return
-
+    elif call.data=="redeem_netflix":
         if chat_id == OWNER_ID:
-            account = netflix_urls[0]
+            account = netflix_urls[0] if netflix_urls else "No URLs left"
             bot.send_message(chat_id, f"✅ Owner redeem:\n{account}")
             return
 
-        if users.get(chat_id, {}).get("points",0) >= 3:
-            account = netflix_urls.pop(0)
-            users[chat_id]["points"] -= 3
-            bot.send_message(chat_id,
+        if users.get(chat_id, {}).get("points",0) >=3:
+            if netflix_urls:
+                account = netflix_urls.pop(0)  # get unique URL
+                users[chat_id]["points"] -=3
+                bot.send_message(chat_id,
 f"""🛒 Order Successfully Completed..📧 Account Direct login URL ❣️👇🏻
 {account}
 
-How to login? :- just tap on the link you'll automatically login in Netflix in your browser ❤️
+How to login? :- just tap the link you'll automatically login in Netflix in your browser ❤️
 
-🎊 Thanks For Using Our Bot 🎊 ~ Send Screenshot To @StarLuxHub ❣️""")
+🎊 Thanks For Using Our Bot 🎊 ~Send Screenshot To @StarLuxHub ❣️""")
+            else:
+                bot.send_message(chat_id, f"❌ No Netflix URLs left {kind_emoji()}")
         else:
             bot.send_message(chat_id, f"❌ Not enough points {kind_emoji()}")
 
-    elif call.data == "referral":
+    elif call.data=="referral":
         bot_username = bot.get_me().username
         referral_link = f"https://t.me/{bot_username}?start={chat_id}"
         invited = users.get(chat_id, {}).get("invited",0)
@@ -110,9 +108,9 @@ def send_main_menu(chat_id):
     keyboard.add(types.InlineKeyboardButton(f"👥 Earn Points / Referral {kind_emoji()}", callback_data="referral"))
     bot.send_message(chat_id, "Select an option:", reply_markup=keyboard)
 
-# ================= ADMIN: ADD POINTS =================
-@bot.message_handler(commands=['addpoints'])
-def addpoints(msg):
+# ================= ADMIN: GIVE POINTS =================
+@bot.message_handler(commands=['givepoints'])
+def givepoints(msg):
     if msg.chat.id not in ADMINS: return
     try:
         parts = msg.text.split()
@@ -120,25 +118,24 @@ def addpoints(msg):
         points = int(parts[2])
         users.setdefault(user_id, {"points":0,"invited":0,"joined":True})
         users[user_id]["points"] += points
-        bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
+        bot.send_message(msg.chat.id,f"✅ Gave {points} points to {user_id} {kind_emoji()}")
     except:
-        bot.send_message(msg.chat.id,f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
+        bot.send_message(msg.chat.id,f"Usage: /givepoints <user_id> <points> {kind_emoji()}")
 
-# ================= ADMIN: ADD MULTIPLE NETFLIX URLS =================
+# ================= ADMIN: ADD & SHUFFLE NETFLIX URLS =================
 @bot.message_handler(commands=['addnetflix'])
 def add_netflix(msg):
     if msg.chat.id not in ADMINS: return
     try:
-        # Remove command text, split by spaces/newlines
-        raw_text = msg.text[len("/addnetflix"):].strip()
-        urls = [u.strip() for u in raw_text.split() if u.strip()]
+        urls = msg.text.split("\n")[1:]  # skip command
+        urls = [u.strip() for u in urls if u.strip()]
         if not urls:
-            bot.send_message(msg.chat.id, f"❌ No URLs detected! Make sure each URL is separated by space or newline.")
+            bot.send_message(msg.chat.id, f"❌ No URLs found! {kind_emoji()}")
             return
-        netflix_urls.clear()       # Clear old URLs
-        random.shuffle(urls)      # Shuffle for randomness
-        netflix_urls.extend(urls)  # Add new URLs
-        bot.send_message(msg.chat.id,f"✅ Replaced Netflix URLs with {len(urls)} new ones {kind_emoji()}")
+        global netflix_urls
+        netflix_urls = urls[:]
+        random.shuffle(netflix_urls)  # shuffle automatically
+        bot.send_message(msg.chat.id,f"✅ Successfully added {len(urls)} Netflix URLs (shuffled) {kind_emoji()}")
     except Exception as e:
         bot.send_message(msg.chat.id,f"❌ Error: {e}")
 
