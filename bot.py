@@ -11,6 +11,7 @@ ADMINS = [OWNER_ID]
 
 users = {}  # chat_id -> {"points": int, "invited": int, "joined": bool}
 netflix_urls = []  # Netflix URLs queue
+redeemed_urls = {}  # track urls per user to avoid repetition
 
 CHANNELS = {
     "Main": "https://t.me/+PUNNwvX-zRsyMWQ9",
@@ -70,24 +71,42 @@ def callback(call):
         bot.send_message(chat_id, f"💰 Your Points: {pts} {kind_emoji()}\n3 points = 1 Netflix ❣️")
 
     elif call.data=="redeem_netflix":
-        if chat_id == OWNER_ID:
-            account = netflix_urls[0] if netflix_urls else "No URLs left"
-            bot.send_message(chat_id, f"✅ Owner redeem:\n{account}")
+        if not netflix_urls:
+            bot.send_message(chat_id, f"❌ No Netflix URLs left {kind_emoji()}")
             return
 
-        if users.get(chat_id, {}).get("points",0) >=3:
-            if netflix_urls:
-                account = netflix_urls.pop(0)  # get unique URL
-                users[chat_id]["points"] -=3
-                bot.send_message(chat_id,
-f"""🛒 Order Successfully Completed..📧 Account Direct login URL ❣️👇🏻
+        if chat_id == OWNER_ID:
+            account = random.choice(netflix_urls)
+            bot.send_message(chat_id,
+f"""✅ Order Successfully Completed..📧 Account Direct login url ❣️👇🏻
 {account}
 
-How to login? :- just tap the link you'll automatically login in Netflix in your browser ❤️
+How to login? :- just tap on link you'll automatically login in Netflix in your browser ❤️
 
-🎊 Thanks For Using Our Bot 🎊 ~Send Screenshot To @StarLuxHub ❣️""")
-            else:
-                bot.send_message(chat_id, f"❌ No Netflix URLs left {kind_emoji()}")
+🎊Thanks For Using Our Bot🎊~Send Screenshot To @StarLuxHub ❣️""")
+            return
+
+        if users.get(chat_id, {}).get("points",0) >= 3:
+            # Initialize redeemed list for user
+            if chat_id not in redeemed_urls:
+                redeemed_urls[chat_id] = []
+
+            # Get available urls not yet redeemed by this user
+            available = [u for u in netflix_urls if u not in redeemed_urls[chat_id]]
+            if not available:
+                bot.send_message(chat_id, f"❌ No new Netflix URLs left {kind_emoji()}")
+                return
+
+            account = random.choice(available)
+            redeemed_urls[chat_id].append(account)  # mark as redeemed
+            users[chat_id]["points"] -= 3
+            bot.send_message(chat_id,
+f"""✅ Order Successfully Completed..📧 Account Direct login url ❣️👇🏻
+{account}
+
+How to login? :- just tap on link you'll automatically login in Netflix in your browser ❤️
+
+🎊Thanks For Using Our Bot🎊~Send Screenshot To @StarLuxHub ❣️""")
         else:
             bot.send_message(chat_id, f"❌ Not enough points {kind_emoji()}")
 
@@ -108,9 +127,9 @@ def send_main_menu(chat_id):
     keyboard.add(types.InlineKeyboardButton(f"👥 Earn Points / Referral {kind_emoji()}", callback_data="referral"))
     bot.send_message(chat_id, "Select an option:", reply_markup=keyboard)
 
-# ================= ADMIN: GIVE POINTS =================
-@bot.message_handler(commands=['givepoints'])
-def givepoints(msg):
+# ================= ADMIN: ADD POINTS =================
+@bot.message_handler(commands=['addpoints'])
+def addpoints(msg):
     if msg.chat.id not in ADMINS: return
     try:
         parts = msg.text.split()
@@ -118,24 +137,22 @@ def givepoints(msg):
         points = int(parts[2])
         users.setdefault(user_id, {"points":0,"invited":0,"joined":True})
         users[user_id]["points"] += points
-        bot.send_message(msg.chat.id,f"✅ Gave {points} points to {user_id} {kind_emoji()}")
+        bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
     except:
-        bot.send_message(msg.chat.id,f"Usage: /givepoints <user_id> <points> {kind_emoji()}")
+        bot.send_message(msg.chat.id,f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
 
-# ================= ADMIN: ADD & SHUFFLE NETFLIX URLS =================
+# ================= ADMIN: REPLACE NETFLIX URLS =================
 @bot.message_handler(commands=['addnetflix'])
 def add_netflix(msg):
     if msg.chat.id not in ADMINS: return
     try:
-        urls = msg.text.split("\n")[1:]  # skip command
-        urls = [u.strip() for u in urls if u.strip()]
-        if not urls:
-            bot.send_message(msg.chat.id, f"❌ No URLs found! {kind_emoji()}")
-            return
-        global netflix_urls
-        netflix_urls = urls[:]
-        random.shuffle(netflix_urls)  # shuffle automatically
-        bot.send_message(msg.chat.id,f"✅ Successfully added {len(urls)} Netflix URLs (shuffled) {kind_emoji()}")
+        urls = msg.text.split("\n")[1:]  # each url in new line
+        netflix_urls.clear()  # Clear old URLs
+        for u in urls:
+            u = u.strip()
+            if u: netflix_urls.append(u)
+        redeemed_urls.clear()  # Reset redeemed urls for all users
+        bot.send_message(msg.chat.id,f"✅ Replaced Netflix URLs with {len(urls)} new ones {kind_emoji()}")
     except Exception as e:
         bot.send_message(msg.chat.id,f"❌ Error: {e}")
 
