@@ -29,7 +29,7 @@ EMOJIS = ["❣️","✨","🔥","💰","✅","👥","🎬","❤️"]
 def kind_emoji():
     return random.choice(EMOJIS)
 
-# ================= JOIN CHECK (FIXED) =================
+# ================= JOIN CHECK =================
 def check_join(user_id):
     try:
         for ch in CHECK_CHANNELS:
@@ -92,14 +92,18 @@ def callback(call):
             )
             return
 
-        users[chat_id]["joined"] = True
-
+        # -------- REFERRAL FIX --------
         referrer = users.get(chat_id,{}).get("referrer")
 
-        if referrer and referrer in users:
+        if referrer and referrer in users and users[chat_id]["joined"] == False:
+
             users[referrer]["points"] += 1
             users[referrer]["invited"] += 1
+
             del users[chat_id]["referrer"]
+
+        users[chat_id]["joined"] = True
+        # -------- END FIX --------
 
         bot.send_message(chat_id,f"✅ Channels joined! Bot unlocked {kind_emoji()}")
         send_main_menu(chat_id)
@@ -192,28 +196,6 @@ def send_main_menu(chat_id):
     ))
 
     bot.send_message(chat_id,"Select an option:",reply_markup=keyboard)
-
-# ================= ADMIN ADD POINTS =================
-@bot.message_handler(commands=['addpoints'])
-def addpoints(msg):
-
-    if msg.chat.id not in ADMINS:
-        return
-
-    try:
-        parts = msg.text.split()
-
-        user_id = int(parts[1])
-        points = int(parts[2])
-
-        users.setdefault(user_id,{"points":0,"invited":0,"joined":True})
-
-        users[user_id]["points"] += points
-
-        bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
-
-    except:
-        bot.send_message(msg.chat.id,"Usage: /addpoints user_id points")
 
 # ================= ADMIN ADD NETFLIX =================
 @bot.message_handler(commands=['addnetflix'])
