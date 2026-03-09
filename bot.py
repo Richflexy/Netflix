@@ -3,19 +3,17 @@ from telebot import types
 import random
 
 # ================= CONFIG =================
-TOKEN = "8730805668:AAGnUrxv2NGZ0X1tcBoPVOLeTHzOq2PT-mQ"  # Your main Netflix bot
-PROOF_BOT_TOKEN = "7980119623:AAEBPBv8dXxsj0KyQ2pEh7Ia5RGKKNFgYYQ"  # For receiving screenshots
-PROOF_BOT = telebot.TeleBot(PROOF_BOT_TOKEN)
-
+TOKEN = "8730805668:AAGnUrxv2NGZ0X1tcBoPVOLeTHzOq2PT-mQ"  # Your Netflix bot
 OWNER_ID = 8260250818
+PROOF_CHANNEL_ID = 3811293838  # Your proof channel
 bot = telebot.TeleBot(TOKEN)
 
 ADMINS = [OWNER_ID]
 
-users = {}
-netflix_urls = []
-redeemed_urls = {}
-waiting_proof = set()
+users = {}  # chat_id -> {"points": int, "invited": int, "joined": bool}
+netflix_urls = []  # Netflix URLs queue
+redeemed_urls = {}  # track urls per user to avoid repetition
+waiting_proof = set()  # users waiting to send screenshot proof
 
 CHANNELS = {
     "Main": "https://t.me/+PUNNwvX-zRsyMWQ9",
@@ -80,6 +78,7 @@ def callback(call):
         pts = users.get(chat_id, {}).get("points", 0)
         if chat_id == OWNER_ID:
             pts = "Unlimited 🔥"
+
         bot.send_message(
             chat_id,
             f"💰 Your Points: {pts} {kind_emoji()}\n2 points = 1 Netflix ❣️"
@@ -130,7 +129,6 @@ How to login? :- just tap on link you'll automatically login in Netflix in your 
 
 🎊Thanks For Using Our Bot🎊~Send Screenshot To @StarLuxHub ❣️""")
             waiting_proof.add(chat_id)
-
         else:
             bot.send_message(chat_id, f"❌ Not enough points {kind_emoji()}")
 
@@ -147,20 +145,22 @@ f"""💰 Invite Users And Earn 1 POINT
 @bot.message_handler(content_types=['photo'])
 def receive_proof(msg):
     chat_id = msg.chat.id
-
     if chat_id not in waiting_proof:
         return
 
     username = msg.from_user.username
     name = msg.from_user.first_name
+
     caption = f"""📸 Netflix Login Proof
 
 👤 Name: {name}
 🔗 Username: @{username}
 🆔 User ID: {chat_id}
 """
-    PROOF_BOT.forward_message(OWNER_ID, chat_id, msg.message_id)
-    PROOF_BOT.send_message(OWNER_ID, caption)
+
+    # Forward screenshot to your proof channel
+    bot.forward_message(PROOF_CHANNEL_ID, chat_id, msg.message_id)
+    bot.send_message(PROOF_CHANNEL_ID, caption)
 
     waiting_proof.remove(chat_id)
     bot.send_message(chat_id, "✅ Screenshot received. You can redeem again ❣️")
@@ -169,11 +169,14 @@ def receive_proof(msg):
 def send_main_menu(chat_id):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(
-        f"💰 My Points {kind_emoji()}", callback_data="points"))
+        f"💰 My Points {kind_emoji()}",
+        callback_data="points"))
     keyboard.add(types.InlineKeyboardButton(
-        f"🎬 Redeem Netflix {kind_emoji()}", callback_data="redeem_netflix"))
+        f"🎬 Redeem Netflix {kind_emoji()}",
+        callback_data="redeem_netflix"))
     keyboard.add(types.InlineKeyboardButton(
-        f"👥 Earn Points / Referral {kind_emoji()}", callback_data="referral"))
+        f"👥 Earn Points / Referral {kind_emoji()}",
+        callback_data="referral"))
     bot.send_message(chat_id, "Select an option:", reply_markup=keyboard)
 
 # ================= ADMIN: ADD POINTS =================
@@ -187,9 +190,15 @@ def addpoints(msg):
         points = int(parts[2])
         users.setdefault(user_id, {"points":0,"invited":0,"joined":True})
         users[user_id]["points"] += points
-        bot.send_message(msg.chat.id, f"✅ Added {points} points to {user_id} {kind_emoji()}")
+        bot.send_message(
+            msg.chat.id,
+            f"✅ Added {points} points to {user_id} {kind_emoji()}"
+        )
     except:
-        bot.send_message(msg.chat.id, f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
+        bot.send_message(
+            msg.chat.id,
+            f"Usage: /addpoints <user_id> <points> {kind_emoji()}"
+        )
 
 # ================= ADMIN: ADD NETFLIX =================
 @bot.message_handler(commands=['addnetflix'])
@@ -201,30 +210,15 @@ def add_netflix(msg):
         netflix_urls.clear()
         for u in urls:
             u = u.strip()
-            if u: netflix_urls.append(u)
+            if u:
+                netflix_urls.append(u)
         redeemed_urls.clear()
-        bot.send_message(msg.chat.id, f"✅ Replaced Netflix URLs with {len(urls)} new ones {kind_emoji()}")
+        bot.send_message(
+            msg.chat.id,
+            f"✅ Replaced Netflix URLs with {len(urls)} new ones {kind_emoji()}"
+        )
     except Exception as e:
         bot.send_message(msg.chat.id,f"❌ Error: {e}")
 
-# ================= ADMIN: STATS =================
-@bot.message_handler(commands=['stats'])
-def stats(msg):
-    if msg.chat.id not in ADMINS:
-        return
-
-    total_users = len(users)
-    redeemed_users = len([u for u, urls in redeemed_urls.items() if urls])
-    waiting_users = len(waiting_proof)
-
-    text = f"""📊 Bot Stats:
-
-👥 Total Users: {total_users}
-🎬 Users Redeemed Netflix: {redeemed_users}
-📸 Waiting Screenshot Proof: {waiting_users}
-"""
-    bot.send_message(msg.chat.id, text)
-
 # ================= RUN BOT =================
 bot.infinity_polling()
-PROOF_BOT.infinity_polling()
