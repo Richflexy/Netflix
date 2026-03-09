@@ -29,13 +29,15 @@ EMOJIS = ["❣️","✨","🔥","💰","✅","👥","🎬","❤️"]
 def kind_emoji():
     return random.choice(EMOJIS)
 
-# ================= JOIN CHECK =================
+# ================= JOIN CHECK (FIXED) =================
 def check_join(user_id):
     try:
         for ch in CHECK_CHANNELS:
             member = bot.get_chat_member(ch, user_id)
-            if member.status not in ["member","administrator","creator"]:
+
+            if member.status in ["left","kicked"]:
                 return False
+
         return True
     except:
         return False
@@ -211,7 +213,7 @@ def addpoints(msg):
         bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
 
     except:
-        bot.send_message(msg.chat.id,f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
+        bot.send_message(msg.chat.id,"Usage: /addpoints user_id points")
 
 # ================= ADMIN ADD NETFLIX =================
 @bot.message_handler(commands=['addnetflix'])
