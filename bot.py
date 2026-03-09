@@ -92,7 +92,6 @@ def callback(call):
             )
             return
 
-        # -------- REFERRAL FIX --------
         referrer = users.get(chat_id,{}).get("referrer")
 
         if referrer and referrer in users and users[chat_id]["joined"] == False:
@@ -103,7 +102,6 @@ def callback(call):
             del users[chat_id]["referrer"]
 
         users[chat_id]["joined"] = True
-        # -------- END FIX --------
 
         bot.send_message(chat_id,f"✅ Channels joined! Bot unlocked {kind_emoji()}")
         send_main_menu(chat_id)
@@ -196,6 +194,31 @@ def send_main_menu(chat_id):
     ))
 
     bot.send_message(chat_id,"Select an option:",reply_markup=keyboard)
+
+# ================= OWNER GIVE POINTS =================
+@bot.message_handler(commands=['givepoints'])
+def give_points(msg):
+
+    if msg.chat.id != OWNER_ID:
+        return
+
+    try:
+        parts = msg.text.split()
+
+        user_id = int(parts[1])
+        amount = int(parts[2])
+
+        if user_id not in users:
+            users[user_id] = {"points":0,"invited":0,"joined":True}
+
+        users[user_id]["points"] += amount
+
+        bot.send_message(msg.chat.id, f"✅ Gave {amount} points to {user_id}")
+
+        bot.send_message(user_id, f"🎉 You received {amount} points!")
+
+    except:
+        bot.send_message(msg.chat.id, "Usage:\n/givepoints user_id amount")
 
 # ================= ADMIN ADD NETFLIX =================
 @bot.message_handler(commands=['addnetflix'])
