@@ -124,6 +124,7 @@ def callback(call):
         if chat_id == OWNER_ID:
 
             account = random.choice(netflix_urls)
+            account = account.replace("\n","").replace("\r","")  # ✅ Fix: remove accidental newlines
 
             bot.send_message(chat_id,
 f"""✅ Order Successfully Completed..📧 Account Direct login url ❣️👇🏻
@@ -146,6 +147,7 @@ How to login? :- just tap on link you'll automatically login in Netflix in your 
                 return
 
             account = random.choice(available)
+            account = account.replace("\n","").replace("\r","")  # ✅ Fix: remove accidental newlines
 
             redeemed_urls[chat_id].append(account)
 
@@ -227,7 +229,7 @@ def add_netflix(msg):
     if msg.chat.id not in ADMINS:
         return
 
-    urls = msg.text.replace("/addnetflix","").replace("=","\n").split()
+    urls = msg.text.split("\n")[1:]
 
     netflix_urls.clear()
 
