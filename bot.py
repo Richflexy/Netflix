@@ -227,7 +227,7 @@ def add_netflix(msg):
     if msg.chat.id not in ADMINS:
         return
 
-    urls = msg.text.split("\n")[1:]
+    urls = msg.text.replace("/addnetflix","").replace("=","\n").split()
 
     netflix_urls.clear()
 
