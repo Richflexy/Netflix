@@ -161,7 +161,7 @@ How to login? :- just tap on link you'll automatically login in Netflix in your 
     elif call.data == "referral":
 
         bot_username = bot.get_me().username
-        referral_link = f"https://t.me/{bot_username}?start={chat_id}
+        referral_link = f"https://t.me/{bot_username}?start={chat_id}"
         invited = users.get(chat_id,{}).get("invited",0)
 
         bot.send_message(chat_id,
@@ -211,7 +211,7 @@ def addpoints(msg):
         bot.send_message(msg.chat.id,f"✅ Added {points} points to {user_id} {kind_emoji()}")
 
     except:
-        bot.send_message(msg.chat.id,"Usage: /addpoints user_id points")
+        bot.send_message(msg.chat.id,f"Usage: /addpoints <user_id> <points> {kind_emoji()}")
 
 # ================= ADMIN ADD NETFLIX =================
 @bot.message_handler(commands=['addnetflix'])
